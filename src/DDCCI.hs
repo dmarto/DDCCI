@@ -9,6 +9,8 @@ module DDCCI (
   -- ~ , find_ddcci_device  -- TODO
 ) where
 
+import Data.Word
+
 import Foreign
 import Foreign.C
 
@@ -16,10 +18,8 @@ import System.Posix
 
 import Control.Concurrent
 
-import Data.Char -- can drop probably?
-
-foreign import ccall unsafe "i2c_read" c_i2c_read :: Fd -> CUInt -> Ptr CUChar -> CInt -> IO CInt
-foreign import ccall unsafe "i2c_write" c_i2c_write :: Fd -> CUInt -> Ptr CUChar -> CInt -> IO CInt
+foreign import ccall unsafe "i2c_read" c_i2c_read :: Fd -> CUInt -> Ptr Word8 -> CInt -> IO CInt
+foreign import ccall unsafe "i2c_write" c_i2c_write :: Fd -> CUInt -> Ptr Word8 -> CInt -> IO CInt
 
 openDevice :: String -> IO Fd
 openDevice dev = openFd dev ReadWrite Nothing defaultFileFlags
@@ -35,25 +35,25 @@ ddcci_write_delay   = 45000 -- 40k works as well, check the speck again
 -- TODO: find a way for control over the magic values
 
 -- |
-checksum :: Int -> [Int] -> Int
+checksum :: Word8 -> [Word8] -> Word8
 checksum start = foldl (xor) start
 
 -- |
-ddcci_write :: Fd -> [Int] -> IO CInt
+ddcci_write :: Fd -> [Word8] -> IO CInt
 ddcci_write device bytes = do
   let buf = build_message bytes
-  ptr <- newArray0 (castCharToCUChar '\0') buf
+  ptr <- newArray0 (0x00 :: Word8) buf
   err <- c_i2c_write device (fromIntegral ddcci_addr) ptr (fromIntegral (length buf))
   -- TODO: error handle
   threadDelay ddcci_write_delay
   return err
   where
-    build_message :: [Int] -> [CUChar]
-    build_message bytes = map castCharToCUChar (map chr (bytes' ++ [checksum ddcci_write_xor bytes'])) where
-      bytes' = (ddcci_first_byte : ((ddcci_second_byte .|. (length bytes)) : bytes))
+    build_message :: [Word8] -> [Word8]
+    build_message bytes = bytes' ++ [checksum ddcci_write_xor bytes'] where
+      bytes' = ddcci_first_byte : (ddcci_second_byte .|. fromIntegral (length bytes)) : bytes
 
 -- |
-ddcci_read :: Fd -> Int -> IO [CUChar]
+ddcci_read :: Fd -> Int -> IO [Word8]
 ddcci_read device len = do
   ptr  <- mallocBytes 127 -- max message length
   err  <- c_i2c_read device (fromIntegral ddcci_addr) ptr (fromIntegral (len + 3))
@@ -69,21 +69,21 @@ ddcci_read device len = do
   return payload
 
 -- |
-ddcci_command :: Fd -> Int -> IO CInt
+ddcci_command :: Fd -> Word8 -> IO CInt
 ddcci_command device byte = ddcci_write device [byte]
 
 -- |
-ddcci_raw_readctrl :: Fd -> Int -> IO [CUChar]
+ddcci_raw_readctrl :: Fd -> Word8 -> IO [Word8]
 ddcci_raw_readctrl device ctrl =
   ddcci_write device [0x01, ctrl] >> ddcci_read device 8
 
 -- |
-ddcci_readctrl :: Fd -> Int -> IO (CUChar, CUChar)
+ddcci_readctrl :: Fd -> Word8 -> IO (Word8, Word8)
 ddcci_readctrl device ctrl = do
   payload <- ddcci_raw_readctrl device ctrl
   if
     (payload !! 0 /= 0x02) ||
-    (payload !! 2 /= castCharToCUChar (chr ctrl))
+    (payload !! 2 /= ctrl)
   then return (255, 255)
     else do
       let cur = ((payload !! 6) * 256 + payload !! 7)
@@ -91,7 +91,7 @@ ddcci_readctrl device ctrl = do
       return (cur, max)
 
 -- |
-ddcci_writectrl :: Fd -> Int -> Int -> IO CInt
+ddcci_writectrl :: Fd -> Word8 -> Word8 -> IO CInt
 ddcci_writectrl device ctrl value =
   ddcci_write device [0x03, ctrl, value `shiftR` 8, value .&. 255]
 
