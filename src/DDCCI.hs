@@ -31,7 +31,7 @@ ddcci_first_byte    = 0x51
 ddcci_second_byte   = 0x80
 ddcci_recieve_xor   = 0x50
 ddcci_write_xor     = (ddcci_addr `shiftL` 1)
-ddcci_write_delay   = 450000
+ddcci_write_delay   = 45000 -- 40k works as well, check the speck again
 -- TODO: find a way for control over the magic values
 
 -- |
