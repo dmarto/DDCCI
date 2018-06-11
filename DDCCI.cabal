@@ -1,9 +1,9 @@
 name:                DDCCI
-version:             0.1.0.0
+version:             0.2.0
 synopsis:            DDC/CI library for Haskell
 description:         DDC/CI library for Haskell
 homepage:            https://dmarto.com/DDDCCI
-license:             BSD3
+license:             BSD2
 license-file:        LICENSE
 author:              Martin Dimov
 maintainer:          martin@dmarto.com

@@ -2,7 +2,6 @@ DDCCI
 ========
 DDC/CI library for Haskell
 
-
 **DISCLAIMER** \
 This is far from something that you can rely on for serious
 work. Wanted to remake my LLCDaemon into Haskell, and this
@@ -15,8 +14,6 @@ embed it into your xmonad and send me a screen shot :wink:
 ### TODO:
  - [ ] example for brightness control
  - [ ] README/Doc
-
-### LICENSED under BSD-3
 
 #### resources, without which this would have not be made
 ```

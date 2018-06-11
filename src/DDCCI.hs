@@ -1,12 +1,17 @@
+--
+-- Copyright (c) 2018, Martin Dimov <martin <at> dmarto <dot> com>
+--    Licensed under the BSD-2-Clause "Simplified BSD License".
+--
+
 module DDCCI (
     openDevice
-  , ddcci_read
-  , ddcci_write
-  , ddcci_command
-  , ddcci_raw_readctrl
-  , ddcci_readctrl
-  , ddcci_writectrl
-  -- ~ , find_ddcci_device  -- TODO
+  , ddcciRead
+  , ddcciReadCtrl
+  , ddcciRawReadCtrl
+  , ddcciWrite
+  , ddcciWriteCtrl
+  , ddcciSendCommand
+  -- ~ , ddcciFindDevice  -- TODO
 ) where
 
 import Data.Word
@@ -26,12 +31,12 @@ openDevice dev = openFd dev ReadWrite Nothing defaultFileFlags
 -- error handling? closing?
 
 -- magic values
-ddcci_addr          = 0x37
-ddcci_first_byte    = 0x51
-ddcci_second_byte   = 0x80
-ddcci_recieve_xor   = 0x50
-ddcci_write_xor     = (ddcci_addr `shiftL` 1)
-ddcci_write_delay   = 45000 -- 40k works as well, check the speck again
+ddcciAddr         = 0x37
+ddcciFirstByte    = 0x51
+ddcciSecondByte   = 0x80
+ddcciRecieveXOR   = 0x50
+ddcciWriteXOR     = (ddcciAddr `shiftL` 1)
+ddcciWriteDelay   = 45000 -- TODO: figure out
 -- TODO: find a way for control over the magic values
 
 -- |
@@ -39,50 +44,27 @@ checksum :: Word8 -> [Word8] -> Word8
 checksum start = foldl (xor) start
 
 -- |
-ddcci_write :: Fd -> [Word8] -> IO CInt
-ddcci_write device bytes = do
-  let buf = build_message bytes
-  ptr <- newArray0 (0x00 :: Word8) buf
-  err <- c_i2c_write device (fromIntegral ddcci_addr) ptr (fromIntegral (length buf))
-  -- TODO: error handle
-  threadDelay ddcci_write_delay
-  return err
-  where
-    build_message :: [Word8] -> [Word8]
-    build_message bytes = bytes' ++ [checksum ddcci_write_xor bytes'] where
-      bytes' = ddcci_first_byte : (ddcci_second_byte .|. fromIntegral (length bytes)) : bytes
-
--- |
-ddcci_read :: Fd -> Int -> IO [Word8]
-ddcci_read device len = do
-  ptr  <- mallocBytes 127 -- max message length
-  err  <- c_i2c_read device (fromIntegral ddcci_addr) ptr (fromIntegral (len + 3))
+ddcciRead :: Fd -> Int -> IO [Word8]
+ddcciRead device len = do
+  ptr  <- mallocBytes 127 -- 127 is max message length
+  err  <- c_i2c_read device (fromIntegral ddcciAddr) ptr (fromIntegral $ len + 3)
   -- TODO: error handle
   list <- peekArray (len + 2) ptr
-  let (control_bytes, payload) = splitAt 2 list
+  let (controlBytes, payload) = splitAt 2 list
   -- TODO: validate payload, what on fail
-    -- ~ if ((list !! 0) == (ddcci_addr * 2))
-    -- ~ && (((list !! 1) .&. ddcci_second_byte) \= 0)
-    -- ~ && (((list !! 1) .&. (complementBit ddcci_second_byte)) <= len)
+    -- ~ if ((list !! 0) == (ddcciAddr * 2))
+    -- ~ && (((list !! 1) .&. ddcciSecondByte) \= 0)
+    -- ~ && (((list !! 1) .&. (complementBit ddcciSecondByte)) <= len)
     -- ~ && (checksum list) == 0
     -- ~ then list
   return payload
 
 -- |
-ddcci_command :: Fd -> Word8 -> IO CInt
-ddcci_command device byte = ddcci_write device [byte]
-
--- |
-ddcci_raw_readctrl :: Fd -> Word8 -> IO [Word8]
-ddcci_raw_readctrl device ctrl =
-  ddcci_write device [0x01, ctrl] >> ddcci_read device 8
-
--- |
-ddcci_readctrl :: Fd -> Word8 -> IO (Word8, Word8)
-ddcci_readctrl device ctrl = do
-  payload <- ddcci_raw_readctrl device ctrl
-  if
-    (payload !! 0 /= 0x02) ||
+ddcciReadCtrl :: Fd -> Word8 -> IO (Word8, Word8)
+ddcciReadCtrl device ctrl = do
+  payload <- ddcciRawReadCtrl device ctrl
+  if -- TODO: refactor in more haskell acceptable way
+    (payload !! 0 /= 0x02) || -- TODO: doc values
     (payload !! 2 /= ctrl)
   then return (255, 255)
     else do
@@ -91,7 +73,29 @@ ddcci_readctrl device ctrl = do
       return (cur, max)
 
 -- |
-ddcci_writectrl :: Fd -> Word8 -> Word8 -> IO CInt
-ddcci_writectrl device ctrl value =
-  ddcci_write device [0x03, ctrl, value `shiftR` 8, value .&. 255]
+ddcciRawReadCtrl :: Fd -> Word8 -> IO [Word8]
+ddcciRawReadCtrl device ctrl =
+  ddcciWrite device [0x01, ctrl] >> ddcciRead device 8 -- TODO: doc values
 
+-- |
+ddcciWrite :: Fd -> [Word8] -> IO CInt
+ddcciWrite device bytes = do
+  let buf = buildMessage bytes
+  ptr <- newArray0 (0x00 :: Word8) buf -- null terminated buffer
+  err <- c_i2c_write device (fromIntegral ddcciAddr) ptr (fromIntegral $ length buf)
+  -- TODO: error handle
+  threadDelay ddcciWriteDelay
+  return err
+  where
+    buildMessage :: [Word8] -> [Word8]
+    buildMessage bytes = bytes' ++ [checksum ddcciWriteXOR bytes'] where
+      bytes' = ddcciFirstByte : (ddcciSecondByte .|. fromIntegral (length bytes)) : bytes
+
+-- |
+ddcciWriteCtrl :: Fd -> Word8 -> Word8 -> IO CInt
+ddcciWriteCtrl device ctrl value =
+  ddcciWrite device [0x03, ctrl, value `shiftR` 8, value .&. 255] -- TODO: doc values
+
+-- |
+ddcciSendCommand :: Fd -> Word8 -> IO CInt
+ddcciSendCommand device byte = ddcciWrite device [byte]

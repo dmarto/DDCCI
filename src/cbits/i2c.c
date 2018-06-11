@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2018, Martin Dimov <martin <at> dmarto <dot> com>
+ *    Licensed under the BSD-2-Clause "Simplified BSD License".
+ */
+
 #include <sys/ioctl.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
@@ -64,4 +69,3 @@ int i2c_write(
 ) {
 	return i2c(fd, addr, 1, buf, len);
 }
-
