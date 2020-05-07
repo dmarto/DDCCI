@@ -37,10 +37,10 @@ int i2c(
 	struct i2c_msg msg;
 	struct i2c_rdwr_ioctl_data msgset;
 
-	msg.addr 	= addr;
-	msg.flags 	= isWR == 1 ? 0 : I2C_M_RD;
-	msg.buf 	= buf;
-	msg.len 	= len;
+	msg.addr    = addr;
+	msg.flags   = isWR == 1 ? 0 : I2C_M_RD;
+	msg.buf     = buf;
+	msg.len     = len;
 
 	msgset.nmsgs = 1;
 	msgset.msgs = &msg;

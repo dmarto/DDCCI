@@ -3,10 +3,10 @@ DDCCI
 DDC/CI library for Haskell
 
 **DISCLAIMER** \
-This is far from something that you can rely on for serious
-work. Wanted to remake my LLCDaemon into Haskell, and this
-is part of the end result.  If you are looking for something
-more serious, check [ddcutil](https://www.ddcutil.com/) and
+This is far from something that you can rely on for serious work.
+Wanted to remake my LLCDaemon into Haskell, and this is part of the end
+result. If you are looking for something more serious, check
+[ddcutil](https://www.ddcutil.com/) and
 [ddccontrol](https://github.com/ddccontrol). If you are brave enough
 embed it into your xmonad and send me a screen shot :wink:
 
